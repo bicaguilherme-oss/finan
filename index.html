@@ -38,24 +38,24 @@
         </h3>
         <button id="btnCloseConfigModal" class="text-slate-400 hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <p class="text-xs text-slate-400">Credenciais configuradas no sistema.</p>
+      <p class="text-xs text-slate-400">Credenciais do Firebase configuradas.</p>
       
       <form id="firebaseConfigForm" class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">API KEY</label>
-          <input type="text" id="cfgApiKey" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
+          <input type="text" id="cfgApiKey" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">AUTH DOMAIN</label>
-          <input type="text" id="cfgAuthDomain" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
+          <input type="text" id="cfgAuthDomain" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">PROJECT ID</label>
-          <input type="text" id="cfgProjectId" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
+          <input type="text" id="cfgProjectId" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">APP ID</label>
-          <input type="text" id="cfgAppId" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
+          <input type="text" id="cfgAppId" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
         </div>
         <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl transition mt-2">
           Salvar e Conectar
@@ -367,6 +367,7 @@
       appId: "1:919686354331:web:8224751547904aee8dbd3e"
     };
 
+    // 1. Definição das funções principais
     function initFirebase(cfg) {
       try {
         const app = initializeApp(cfg);
@@ -393,8 +394,41 @@
       }
     }
 
+    function listenToData() {
+      if (!currentUser || !db) return;
+
+      const qTx = query(collection(db, 'transactions'), where('uid', '==', currentUser.uid));
+      if (unsubscribeTx) unsubscribeTx();
+      unsubscribeTx = onSnapshot(qTx, (snapshot) => {
+        transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        render();
+      });
+
+      const qGoals = query(collection(db, 'goals'), where('uid', '==', currentUser.uid));
+      if (unsubscribeGoals) unsubscribeGoals();
+      unsubscribeGoals = onSnapshot(qGoals, (snapshot) => {
+        goals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderGoals();
+      });
+    }
+
+    function clearData() {
+      transactions = [];
+      goals = [];
+      render();
+      renderGoals();
+    }
+
+    function parseAmountValue(valStr) {
+      if (!valStr) return 0;
+      const cleanStr = valStr.replace(/\./g, '').replace(',', '.');
+      return parseFloat(cleanStr) || 0;
+    }
+
+    // 2. Inicialização do App
     initFirebase(defaultFirebaseConfig);
 
+    // 3. Modais e Eventos de Configuração
     document.getElementById('firebaseConfigForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const cfg = {
@@ -447,7 +481,7 @@
 
     document.getElementById('btnLogout').addEventListener('click', () => signOut(auth));
 
-    // Máscara Monetária Automática para o campo Valor
+    // 4. Máscara Monetária no Input de Valor
     const txAmountInput = document.getElementById('txAmount');
     txAmountInput.addEventListener('input', (e) => {
       let value = e.target.value.replace(/\D/g, '');
@@ -462,37 +496,7 @@
       });
     });
 
-    function parseAmountValue(valStr) {
-      if (!valStr) return 0;
-      const cleanStr = valStr.replace(/\./g, '').replace(',', '.');
-      return parseFloat(cleanStr) || 0;
-    }
-
-    function listenToData() {
-      if (!currentUser || !db) return;
-
-      const qTx = query(collection(db, 'transactions'), where('uid', '==', currentUser.uid));
-      if (unsubscribeTx) unsubscribeTx();
-      unsubscribeTx = onSnapshot(qTx, (snapshot) => {
-        transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        render();
-      });
-
-      const qGoals = query(collection(db, 'goals'), where('uid', '==', currentUser.uid));
-      if (unsubscribeGoals) unsubscribeGoals();
-      unsubscribeGoals = onSnapshot(qGoals, (snapshot) => {
-        goals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderGoals();
-      });
-    }
-
-    function clearData() {
-      transactions = [];
-      goals = [];
-      render();
-      renderGoals();
-    }
-
+    // 5. Controlo de Formulários de Transação e Metas
     const today = new Date();
     document.getElementById('filterMonth').value = today.toISOString().slice(0, 7);
     document.getElementById('txDate').value = today.toISOString().slice(0, 10);
@@ -600,6 +604,7 @@
       select.innerHTML = list.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
+    // 6. Funções de Renderização dos Dados
     function render() {
       const selectedMonth = document.getElementById('filterMonth').value;
       const search = document.getElementById('filterSearch').value.toLowerCase();
